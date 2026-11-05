@@ -47,7 +47,24 @@ jobs:
 
       - name: Fetch Android runtime sources
         shell: pwsh
-        run: pwsh -NoProfile -File tools/android-runtime/fetch_sources.ps1
+        run: |
+          $sourceScript = "tools/android-runtime/fetch_sources.ps1"
+          $sourceText = Get-Content -LiteralPath $sourceScript -Raw
+          $sourceText = $sourceText.Replace(
+            "https://www.samba.org/ftp/talloc/",
+            "https://download.samba.org/pub/talloc/"
+          )
+          Set-Content -LiteralPath $sourceScript -Value $sourceText -NoNewline
+          $maxAttempts = 3
+          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            & pwsh -NoProfile -File $sourceScript
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($attempt -eq $maxAttempts) {
+              throw "Android runtime source download failed after $maxAttempts attempts"
+            }
+            Write-Warning "Source download failed (attempt $attempt/$maxAttempts); retrying in $($attempt * 15) seconds."
+            Start-Sleep -Seconds ($attempt * 15)
+          }
 
       - name: Fetch Android NDK
         run: bash tools/android-runtime/fetch_ndk_wsl.sh
